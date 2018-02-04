@@ -1,0 +1,21 @@
+[package]
+name = "gpio_sensors"
+version = "0.0.1"
+authors = ["rumatoest"]
+description = "Interface to read arduino compatible sensors on RaspberryPi"
+#documentation = ""
+#repository = ""
+readme = "README.md"
+license = "MIT"
+categories = ["embedded", "hardware-support"]
+keywords = ["raspberry","pi","gpio","peripherals","sensors","dht"]
+
+
+[dependencies]
+rppal = "0.2.0"
+#rppal = {version = "0.2.0", optional = true }
+libc = {version = "0.2.36", optional = true }
+
+[features]
+#use_rppal = []
+use_libc = ["libc"]
