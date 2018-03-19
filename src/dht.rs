@@ -1,4 +1,4 @@
-use gpio::{gpio_common_new, GpioCommon};
+use gpio::{gpio_pin_new, GpioPin};
 
 use std::error::Error;
 use std::thread;
@@ -84,7 +84,7 @@ impl DhtValue {
 pub struct DhtSensor {
     pin: u8,
     dht_type: DhtType,
-    gpio: Box<GpioCommon>,
+    gpio: Box<GpioPin>,
     last_read: Instant,
     value: [u8; 5],
 }
@@ -95,16 +95,16 @@ pub struct DhtSensor {
 /// - https://github.com/adafruit/Adafruit_Python_DHT/blob/master/source/Raspberry_Pi/pi_dht_read.c
 impl DhtSensor {
     pub fn new(pin: u8, dht_type: DhtType) -> Result<DhtSensor, Box<Error>> {
-        let gpio = gpio_common_new(pin)?;
+        let gpio = gpio_pin_new(pin as u32)?;
         DhtSensor::new_common(pin, dht_type, gpio)
     }
 
     fn new_common(
         pin: u8,
         dht_type: DhtType,
-        mut gpio: Box<GpioCommon>,
+        mut gpio: Box<GpioPin>,
     ) -> Result<DhtSensor, Box<Error>> {
-        gpio.mode_input();
+        gpio.direction_input();
         Ok(DhtSensor {
             pin: pin,
             dht_type: dht_type,
@@ -192,8 +192,7 @@ impl DhtSensor {
         //   http://www.adafruit.com/datasheets/Digital%20humidity%20and%20temperature%20sensor%20AM2302.pdf
         // Go into high impedence state to let pull-up raise data line level and
         // start the reading process.
-        self.gpio.mode_output();
-        self.gpio.high();
+        self.gpio.direction_output(1);
         thread::sleep(Duration::from_millis(250));
 
         // Try to raise thread priority
@@ -226,11 +225,11 @@ impl DhtSensor {
             let end_sleep = Instant::now() + Duration::from_millis(20);
             // Voltage  level  from  high to  low.
             // This process must take at least 18ms to ensure DHT’s detection of MCU's signal.
-            self.gpio.low();
+            self.gpio.set_low();
             // Busy wait cycle should be better than //thread::sleep(Duration::from_millis(18));
             while Instant::now() < end_sleep {}
 
-            self.gpio.mode_input();
+            self.gpio.direction_input();
             // MCU will pull up voltage and wait 20-40us for DHT’s response
             // Delay a bit to let sensor pull data line low.
 
@@ -256,14 +255,8 @@ impl DhtSensor {
             let mut i = 0;
             let mut x = 0;
             while i < 83 {
-                let v = self.gpio.read().map_err(|e| {
-                    IoError::new(IoErrorKind::Interrupted, e.description())
-                });
-                if v.is_err() {
-                    err = Some(v.unwrap_err());
-                    break;
-                }
-                if (i % 2 == 0) == v.unwrap() {
+                let v = self.gpio.read() == 1;
+                if (i % 2 == 0) == v  {
                     // Instead of reading time we just count number of cycles until next level value
                     cycles[i] += 1;
                 } else {

@@ -6,7 +6,7 @@ extern crate libc;
 //#[cfg(feature = "use_rppal")]
 extern crate rppal;
 
-mod gpio;
+pub mod gpio;
 pub mod dht;
 
 #[cfg(test)]
