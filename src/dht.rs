@@ -1,20 +1,18 @@
 use gpio::{gpio_pin_new, GpioPin};
 
 use std::error::Error;
+use std::fmt;
+use std::io::Error as IoError;
+use std::io::ErrorKind as IoErrorKind;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use std::io::Error as IoError;
-use std::io::ErrorKind as IoErrorKind;
-
 #[cfg(feature = "use_libc")]
-use libc::{SCHED_FIFO, sched_param, sched_getparam, sched_getscheduler, sched_setscheduler,
-           sched_get_priority_max, __errno_location};
-
+use libc::{__errno_location, sched_get_priority_max, sched_getparam, sched_getscheduler,
+           sched_param, sched_setscheduler, SCHED_FIFO};
 
 const MINIMUM_CACHE: u64 = 1250; // miliseconds
 const CACHE_ON_ERROR: u64 = 5; //seconds
-
 
 /// Determine DHT sensor types
 #[derive(Debug, Clone)]
@@ -24,14 +22,12 @@ pub enum DhtType {
     DHT22,
 }
 
-
 /// Represent readings from DHT* sensor .
 #[derive(Debug)]
 pub struct DhtValue {
     dht_type: DhtType,
     value: [u8; 5],
 }
-
 
 impl DhtValue {
     /// Return temperature readings in Fahrenheit.
@@ -79,8 +75,6 @@ impl DhtValue {
     }
 }
 
-
-//#[derive(Debug)]
 pub struct DhtSensor {
     pin: u8,
     dht_type: DhtType,
@@ -88,7 +82,6 @@ pub struct DhtSensor {
     last_read: Instant,
     value: [u8; 5],
 }
-
 
 /// Ideas about DHT reading sensors was found here:
 /// - https://github.com/adafruit/DHT-sensor-library/blob/master/DHT.cpp
@@ -207,16 +200,19 @@ impl DhtSensor {
                 sched_setscheduler(
                     0,
                     SCHED_FIFO,
-                    &sched_param { sched_priority: sched_get_priority_max(SCHED_FIFO) },
+                    &sched_param {
+                        sched_priority: sched_get_priority_max(SCHED_FIFO),
+                    },
                 )
             };
 
             #[cfg(debug_assertions)]
             {
                 if priup != 0 {
-                    println!("DHT ERROR failed call to sched_setscheduler() with errno {}", unsafe {
-                        *__errno_location()
-                    });
+                    println!(
+                        "DHT ERROR failed call to sched_setscheduler() with errno {}",
+                        unsafe { *__errno_location() }
+                    );
                 }
             }
         }
@@ -256,7 +252,7 @@ impl DhtSensor {
             let mut x = 0;
             while i < 83 {
                 let v = self.gpio.read() == 1;
-                if (i % 2 == 0) == v  {
+                if (i % 2 == 0) == v {
                     // Instead of reading time we just count number of cycles until next level value
                     cycles[i] += 1;
                 } else {
@@ -312,8 +308,8 @@ impl DhtSensor {
         }
 
         // Check we read 40 bits and that the checksum matches.
-        if data[4] as u16 ==
-            ((data[0] as u16 + data[1] as u16 + data[2] as u16 + data[3] as u16) & 0xFF)
+        if data[4] as u16
+            == ((data[0] as u16 + data[1] as u16 + data[2] as u16 + data[3] as u16) & 0xFF)
         {
             self.value = data;
             self.last_read = Instant::now();
@@ -322,17 +318,17 @@ impl DhtSensor {
                 dht_type: self.dht_type.clone(),
             })
         } else {
-            let err = IoError::new(
-                IoErrorKind::InvalidData,
-                format!(
-                    "Checksum failure!",
-                ),
-            );
+            let err = IoError::new(IoErrorKind::InvalidData, format!("Checksum failure!",));
             Err(err)
         }
     }
 }
 
+impl fmt::Debug for DhtSensor {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "DHT ({:?} pin:{})", self.dht_type, self.pin)
+    }
+}
 
 /// Calculate heat index Using both Rothfusz and Steadman's equations
 /// http://www.wpc.ncep.noaa.gov/html/heatindex_equation.shtml
@@ -344,20 +340,20 @@ fn heat_index(temp: f32, humidity: f32, fahrenheit: bool) -> f32 {
     if !fahrenheit {
         temperature = temp * 1.8 + 32.0;
     }
-    let mut hi: f32 = 0.5 *
-        (temperature + 61.0 + ((temperature - 68.0) * 1.2) + (humidity * 0.094));
+    let mut hi: f32 =
+        0.5 * (temperature + 61.0 + ((temperature - 68.0) * 1.2) + (humidity * 0.094));
 
     if hi > 79.0 {
-        hi = -42.379 + 2.04901523 * temperature + 10.14333127 * humidity +
-            -0.22475541 * temperature * humidity +
-            -0.00683783 * temperature.powf(2.0) + -0.05481717 * humidity.powf(2.0) +
-            0.00122874 * temperature.powf(2.0) * humidity +
-            0.00085282 * temperature * humidity.powf(2.0) +
-            -0.00000199 * temperature.powf(2.0) * humidity.powf(2.0);
+        hi = -42.379 + 2.04901523 * temperature + 10.14333127 * humidity
+            + -0.22475541 * temperature * humidity
+            + -0.00683783 * temperature.powf(2.0) + -0.05481717 * humidity.powf(2.0)
+            + 0.00122874 * temperature.powf(2.0) * humidity
+            + 0.00085282 * temperature * humidity.powf(2.0)
+            + -0.00000199 * temperature.powf(2.0) * humidity.powf(2.0);
 
         if (humidity < 13.0) && (temperature >= 80.0) && (temperature <= 112.0) {
-            hi -= ((13.0 - humidity) * 0.25) *
-                ((17.0 - (temperature - 95.0).abs()) * 0.05882).sqrt();
+            hi -=
+                ((13.0 - humidity) * 0.25) * ((17.0 - (temperature - 95.0).abs()) * 0.05882).sqrt();
         } else if (humidity > 85.0) && (temperature >= 80.0) && (temperature <= 87.0) {
             hi += ((humidity - 85.0) * 0.1) * ((87.0 - temperature) * 0.2);
         }
