@@ -7,9 +7,11 @@ use std::io::ErrorKind as IoErrorKind;
 use std::thread;
 use std::time::{Duration, Instant};
 
+/*
 #[cfg(feature = "use_libc")]
 use libc::{__errno_location, sched_get_priority_max, sched_getparam, sched_getscheduler,
            sched_param, sched_setscheduler, SCHED_FIFO};
+*/
 
 const MINIMUM_CACHE: u64 = 1250; // miliseconds
 const CACHE_ON_ERROR: u64 = 5; //seconds
@@ -189,6 +191,7 @@ impl DhtSensor {
         thread::sleep(Duration::from_millis(250));
 
         // Try to raise thread priority
+        /*
         #[cfg(feature = "use_libc")]
         let mut prev_sched_param = sched_param { sched_priority: 0 };
         #[cfg(feature = "use_libc")]
@@ -216,6 +219,7 @@ impl DhtSensor {
                 }
             }
         }
+        */
         // Time critical section begins
         {
             let end_sleep = Instant::now() + Duration::from_millis(20);
@@ -272,12 +276,15 @@ impl DhtSensor {
         }
         // Timing critical code is now complete.
         // Return priority to previous value
+        /*
         #[cfg(feature = "use_libc")]
         unsafe { sched_setscheduler(0, prev_sched_policy, &prev_sched_param) };
 
         if err.is_some() {
             return Err(err.unwrap());
         }
+        */
+        //self.gpio.direction_output(1);
 
         // Inspect pulses and determine which ones are 0 (high state cycle count < low
         // state cycle count), or 1 (high state cycle count > low state cycle count).

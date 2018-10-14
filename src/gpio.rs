@@ -96,9 +96,9 @@ impl GpioPin for GpioPinRppal {
 
     fn set(&mut self, value: i32) {
         if value > 0 {
-            self.rppal.write(self.pin, rppal::gpio::Level::High)
-        } else if value == 0 {
-            self.rppal.write(self.pin, rppal::gpio::Level::Low)
+            self.rppal.write(self.pin, rppal::gpio::Level::High);
+        } else {
+            self.rppal.write(self.pin, rppal::gpio::Level::Low);
         }
     }
 
